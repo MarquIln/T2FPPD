@@ -15,31 +15,31 @@ const (
 
 // BarberShop struct representa a barbearia.
 type BarberShop struct {
-	mutex         sync.Mutex
-	customers     int
-	waitingRoom   chan int
-	sofa          chan int
-	barberChair   chan int
-	barberPillow  chan int
-	cash          chan int
-	receipt       chan int
-	customerReady chan int
-	doneCutting   chan int
-	doneCash      chan int
+	mutex            sync.Mutex
+	customers        int
+	waitingRoom      chan int
+	sofa             chan int
+	barberChair      chan int
+	barberPillow     chan int
+	cash             chan int
+	receipt          chan int
+	waitingRoomCount int
+	sofaCount        int
+	doneCutting      chan int
 }
 
 // NovoBarberShop cria uma nova instância de uma barbearia.
 func NovoBarberShop() *BarberShop {
 	return &BarberShop{
-		waitingRoom:   make(chan int, waitingRoomSize),
-		sofa:          make(chan int, sofaSize),
-		barberChair:   make(chan int, numBarbers),
-		barberPillow:  make(chan int, numBarbers),
-		cash:          make(chan int, 1),
-		receipt:       make(chan int, 1),
-		customerReady: make(chan int, numBarbers),
-		doneCutting:   make(chan int, numBarbers),
-		doneCash:      make(chan int, numBarbers),
+		waitingRoom:      make(chan int, waitingRoomSize),
+		sofa:             make(chan int, sofaSize),
+		barberChair:      make(chan int, numBarbers),
+		barberPillow:     make(chan int, numBarbers),
+		cash:             make(chan int, 1),
+		receipt:          make(chan int, 1),
+		waitingRoomCount: 0,
+		sofaCount:        0,
+		doneCutting:      make(chan int, numBarbers),
 	}
 }
 
@@ -55,29 +55,37 @@ func (b *BarberShop) customer(id int, wg *sync.WaitGroup) {
 		return
 	}
 	b.customers++
+	b.waitingRoomCount++
 	b.mutex.Unlock()
 
 	// Entra na sala de espera.
 	b.waitingRoom <- id
-	fmt.Printf("Cliente %d entrou na sala de espera.\n", id)
+	fmt.Printf("Cliente %d entrou na sala de espera. Sala de espera: %d clientes.\n", id, b.waitingRoomCount)
 
 	// Tenta sentar no sofá.
-	sofaPos := <-b.waitingRoom
-	b.sofa <- sofaPos
-	fmt.Printf("Cliente %d sentou no sofá.\n", id)
+	<-b.waitingRoom
+	b.mutex.Lock()
+	b.waitingRoomCount--
+	b.sofaCount++
+	b.mutex.Unlock()
+	b.sofa <- id
+	fmt.Printf("Cliente %d sentou no sofá. Sofá: %d clientes.\n", id, b.sofaCount)
 
 	// Tenta sentar na cadeira do barbeiro.
-	sofaPos = <-b.sofa
-	b.barberChair <- sofaPos
+	<-b.sofa
+	b.mutex.Lock()
+	b.sofaCount--
+	b.mutex.Unlock()
+	b.barberChair <- id
 	fmt.Printf("Cliente %d sentou na cadeira do barbeiro.\n", id)
 
 	// Aguarda o barbeiro e obtém o corte de cabelo.
-	barberPos := <-b.barberChair
-	b.barberPillow <- barberPos
+	<-b.barberChair
+	b.barberPillow <- id
 	<-b.doneCutting
 
 	// Paga e aguarda o recibo.
-	b.cash <- barberPos
+	b.cash <- id
 	<-b.receipt
 	fmt.Printf("Cliente %d pagou e saiu da barbearia.\n", id)
 
