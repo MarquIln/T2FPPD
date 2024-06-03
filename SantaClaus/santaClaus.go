@@ -14,14 +14,17 @@ var elfTex = NewSemaphore(1)
 
 func main() {
 
+	// Cria goroutines para a chegada dos elfos
 	for i := 1; i <= 1000; i++ {
 		go elfArrives()
 	}
 
+	// Cria goroutines para a chegada das renas
 	for i := 1; i <= 9; i++ {
 		go reindeerArrives()
 	}
 
+	// Loop principal onde o Papai Noel verifica se precisa ajudar os elfos ou preparar o trenó
 	for {
 		santaSem.Wait()
 		mutex.Wait()
@@ -100,12 +103,14 @@ func getHelp() {
 	time.Sleep(1 * time.Second)
 }
 
+// Estrutura do semáforo para controle de acesso
 type Semaphore struct {
 	v    int
 	fila chan struct{}
 	sc   chan struct{}
 }
 
+// Função para criar um novo semáforo
 func NewSemaphore(init int) *Semaphore {
 	s := &Semaphore{
 		v:    init,
@@ -115,6 +120,7 @@ func NewSemaphore(init int) *Semaphore {
 	return s
 }
 
+// Método Wait do semáforo para esperar a liberação
 func (s *Semaphore) Wait() {
 	s.sc <- struct{}{}
 	s.v--
@@ -126,6 +132,7 @@ func (s *Semaphore) Wait() {
 	}
 }
 
+// Método Signal do semáforo para sinalizar a liberação
 func (s *Semaphore) Signal() {
 	s.sc <- struct{}{}
 	s.v++
